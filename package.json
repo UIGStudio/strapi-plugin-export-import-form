@@ -1,0 +1,33 @@
+{
+  "name": "strapi-plugin-export-import-form",
+  "version": "0.1.0",
+  "description": "Client-side export import content plugin",
+  "strapi": {
+    "name": "export-import-form",
+    "description": "Client-side export import content plugin",
+    "kind": "plugin"
+  },
+  "dependencies": {
+    "@strapi/strapi": "^4.4.3"
+  },
+  "devDependencies": {
+    "typescript": "4.6.3"
+  },
+  "author": {
+    "name": "UIG Studio"
+  },
+  "maintainers": [
+    {
+      "name": "UIG Studio"
+    }
+  ],
+  "engines": {
+    "node": ">=14.19.1 <=18.x.x",
+    "npm": ">=6.0.0"
+  },
+  "scripts": {
+    "develop": "tsc -w",
+    "build": "tsc"
+  },
+  "license": "MIT"
+}
