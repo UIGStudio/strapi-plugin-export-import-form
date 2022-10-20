@@ -1,6 +1,6 @@
 {
   "name": "strapi-plugin-export-import-form",
-  "version": "0.4.0",
+  "version": "0.4.5",
   "description": "Client-side export import content plugin",
   "strapi": {
     "name": "export-import-form",

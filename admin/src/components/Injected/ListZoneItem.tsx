@@ -17,6 +17,7 @@ import { Alert } from '@strapi/design-system/Alert';
 import { Portal } from '@strapi/design-system/Portal';
 import { Flex } from '@strapi/design-system/Flex';
 import { auth } from '@strapi/helper-plugin';
+import { Switch } from '@strapi/design-system/Switch';
 import './style.css';
 
 const emptyArray = [];
@@ -33,6 +34,10 @@ export const StrapiListZoneItem = ({ strapi }) => {
   const [linkPageRelations, setLinkpageRelations] =
     useState<{ key: KeyType; data: any }[]>(emptyArray);
   const shouldTriggerValidation = useRef(false);
+
+  const [useExistingAssets, setUseExistingAssets] = useState(true);
+
+  const existingAssets = useRef<Record<string, any>[] | null>();
 
   const exportForm = async () => {
     try {
@@ -88,8 +93,42 @@ export const StrapiListZoneItem = ({ strapi }) => {
       console.log('Unhandled file id', data, key);
     }
 
+    if (useExistingAssets && existingAssets.current) {
+      const identicalExistingAsset = existingAssets.current?.find(
+        (file) =>
+          // Matching these properties should be practically enough to check if it is identical
+          // NOTE: reported size may differ depending on upload provider
+          [
+            'name',
+            'alternativeText',
+            'caption',
+            'width',
+            'height',
+            'ext',
+            'mime',
+            'size',
+            'folder',
+          ].every((property) => file[property] === data[property])
+      );
+
+      if (identicalExistingAsset) {
+        console.log(
+          'Found existing asset',
+          identicalExistingAsset.name,
+          key
+        );
+
+        return identicalExistingAsset;
+      }
+    }
+
     try {
-      console.log('Fetching file', data.name, key);
+      console.log(
+        `Fetching ${useExistingAssets ? 'new' : ''} file`,
+        data.name,
+        data,
+        key
+      );
       const response = await fetch(data.url);
 
       if (!response.ok) {
@@ -114,8 +153,6 @@ export const StrapiListZoneItem = ({ strapi }) => {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${auth.getToken()}`,
-          // Accept: 'application/json',
-          // 'Content-Type': 'multipart/form-data',
         },
         body: formData,
       });
@@ -142,7 +179,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
   };
 
   const prepareData = async (data: any, key: KeyType) => {
-    console.log('Preparing', key.join('.'));
+    // console.log('Preparing', key.join('.'));
 
     if (typeof data === 'object' && data !== null) {
       if (data.length !== undefined) {
@@ -196,6 +233,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
       setState('inProgress');
       console.log('Importing from clipboard');
       setLinkpageRelations(emptyArray);
+      existingAssets.current = null;
       const json = await navigator.clipboard.readText();
       const dataToImport = JSON.parse(json);
       console.log(dataToImport);
@@ -206,6 +244,36 @@ export const StrapiListZoneItem = ({ strapi }) => {
         )
       );
       console.log('Updatable top level keys:', updatableTopLevelKeys);
+
+      if (useExistingAssets) {
+        try {
+          console.log('Fetching existing assets');
+          const response = await fetch(
+            '/upload/files?page=1&pageSize=10000',
+            {
+              headers: {
+                Authorization: `Bearer ${auth.getToken()}`,
+              },
+            }
+          );
+
+          if (!response.ok) {
+            throw new Error('Response not ok');
+          }
+
+          existingAssets.current = JSON.parse(
+            await response.text()
+          ).results;
+
+          console.log(
+            `Found ${existingAssets.current!.length} existing assets`,
+            existingAssets.current
+          );
+        } catch (e) {
+          console.log('Failed to fetch existing assets');
+          console.error(e);
+        }
+      }
 
       await Promise.all(
         Object.keys(dataToImport)
@@ -245,7 +313,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
       ctx.triggerFormValidation();
       ctx.checkFormErrors();
       // Trigger form validation in draft state.
-      ctx.onPublish();
+      // ctx.onPublish();
 
       shouldTriggerValidation.current = false;
     }
@@ -266,7 +334,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
     inProgress: {
       variant: 'default',
       children: (
-        <Flex inline gap={1}>
+        <Flex inline gap={1} alignItems={'flexStart'}>
           {'Operation in progress.'}
           <Loader small />
         </Flex>
@@ -309,6 +377,17 @@ export const StrapiListZoneItem = ({ strapi }) => {
           </Flex>
         ) : (
           <>
+            <Flex gap={1}>
+              <Switch
+                selected={useExistingAssets}
+                onChange={(event) =>
+                  setUseExistingAssets(event.target.value)
+                }
+              />
+              <Typography variant="sigma" textColor="neutral600">
+                {'Reuse existing assets if the same*'}
+              </Typography>
+            </Flex>
             <Button onClick={exportForm}>
               {'Export to clipboard'}
             </Button>
