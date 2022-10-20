@@ -28,6 +28,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
 
   const [linkPageRelations, setLinkpageRelations] =
     useState<{ key: (string | number)[]; data: any }[]>(emptyArray);
+  const shouldTriggerValidation = useRef(false);
 
   const exportForm = async () => {
     try {
@@ -47,16 +48,28 @@ export const StrapiListZoneItem = ({ strapi }) => {
     }
   };
 
+  const prepareImage = (data: any) => {
+    console.log('Skipping image', data?.alternativeText);
+
+    return null;
+  };
+
   const prepareData = (data: any, key: (string | number)[]) => {
     console.log('Preparing', key.join('.'));
 
     if (typeof data === 'object' && data !== null) {
       if (data.length !== undefined) {
         return (data as any[]).map((item, index) =>
-          prepareData(item, [...key, index])
+          prepareData(item, [
+            ...key,
+            item?.__component
+              ? `${item.__component.replace('.', '_')}#${index}`
+              : index,
+          ])
         );
       } else {
         // Object
+        delete data.id;
 
         // Image
         if (
@@ -64,45 +77,48 @@ export const StrapiListZoneItem = ({ strapi }) => {
           'updatedBy' in data &&
           'alternativeText' in data
         ) {
-          return data;
+          return prepareImage(data);
         }
 
         // Link
         if ('url' in data && 'target' in data && 'page' in data) {
-          if (data.page?.id) {
+          const link = {
+            ...data,
+            icon: prepareImage(data.icon),
+          };
+
+          if (link.page?.id) {
             // Link with relation
             setLinkpageRelations((current) => [
               ...current,
-              { key, data },
+              { key, data: link },
             ]);
             return {
-              ...data,
-              page: {
-                // This will prevent submitting the form by throwing server error
-                // until all relations are resolved by the user
-                id: `Select stg page ${data.page.id}`,
-              },
+              ...link,
+              // page: {
+              //   // This will prevent submitting the form by throwing server error
+              //   // until all relations are resolved by the user
+              //   id: `Select stg page ${link.page.id}`,
+              // },
+              page: null,
             };
           } else {
-            return data;
+            return link;
           }
         }
 
         return Object.fromEntries(
-          (Object.entries(data) as [string, any][]).map(
-            ([property, value]) => [
+          (Object.entries(data) as [string, any][])
+            .filter(([property]) => property !== 'id')
+            .map(([property, value]) => [
               property,
               prepareData(value, [...key, property]),
-            ]
-          )
+            ])
         );
       }
-    } else {
-      if ([...key].pop() === 'id' && typeof data === 'number') {
-        return data + 100;
-      }
-      return data;
     }
+
+    return data;
   };
 
   const importForm = async () => {
@@ -134,6 +150,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
           }
         });
 
+      shouldTriggerValidation.current = true;
       console.log('Import done!');
       setState('success');
     } catch (e) {
@@ -142,6 +159,23 @@ export const StrapiListZoneItem = ({ strapi }) => {
       setState('error');
     }
   };
+
+  useEffect(() => {
+    if (shouldTriggerValidation.current) {
+      console.log('Triggering validation', ctx);
+      console.log(
+        `${linkPageRelations?.length}} page relations need to be set manually`,
+        linkPageRelations
+      );
+
+      ctx.triggerFormValidation();
+      ctx.checkFormErrors();
+      // Trigger form validation in draft state.
+      ctx.onPublish();
+
+      shouldTriggerValidation.current = false;
+    }
+  }, [ctx]);
 
   useEffect(() => {
     if (state && state !== 'inProgress') {
@@ -199,22 +233,17 @@ export const StrapiListZoneItem = ({ strapi }) => {
 
             {linkPageRelations.length ? (
               <>
-                <Typography
-                  variant="sigma"
-                  textColor="danger600"
-                  marginTop={6}
-                >
-                  {`There are ${linkPageRelations.length} page relations that require human intervention:`}
-                </Typography>
-                <Box paddingTop={2} paddingBottom={2}>
+                <Box paddingTop={5} paddingBottom={2}>
                   <Divider />
                 </Box>
-
+                <Typography variant="sigma" textColor="danger600">
+                  {`There are ${linkPageRelations.length} page relations that require human intervention:`}
+                </Typography>
                 <Stack spacing={1}>
                   {linkPageRelations.map(({ key, data }) => (
                     <Typography variant="pi" textColor="neutral600">
                       {key.join('.')}
-                      {': stg#'}
+                      {': $'}
                       {data?.page?.id}
                     </Typography>
                   ))}
