@@ -15,9 +15,13 @@ import { useCMEditViewDataManager } from '@strapi/helper-plugin';
 import { Loader } from '@strapi/design-system/Loader';
 import { Alert } from '@strapi/design-system/Alert';
 import { Portal } from '@strapi/design-system/Portal';
+import { Flex } from '@strapi/design-system/Flex';
+import { auth } from '@strapi/helper-plugin';
 import './style.css';
 
 const emptyArray = [];
+
+type KeyType = (string | number)[];
 
 export const StrapiListZoneItem = ({ strapi }) => {
   const ctx = useCMEditViewDataManager();
@@ -27,7 +31,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
   >(null);
 
   const [linkPageRelations, setLinkpageRelations] =
-    useState<{ key: (string | number)[]; data: any }[]>(emptyArray);
+    useState<{ key: KeyType; data: any }[]>(emptyArray);
   const shouldTriggerValidation = useRef(false);
 
   const exportForm = async () => {
@@ -48,24 +52,110 @@ export const StrapiListZoneItem = ({ strapi }) => {
     }
   };
 
-  const prepareImage = (data: any) => {
-    console.log('Skipping image', data?.alternativeText);
+  const handleLink = async (data: any, key: KeyType) => {
+    const link = {
+      ...data,
+      icon: await handleFile(data.icon, key),
+    };
+
+    if (link.page?.id) {
+      // Link with relation
+      setLinkpageRelations((current) => [
+        ...current,
+        { key, data: link },
+      ]);
+      return {
+        ...link,
+        // page: {
+        //   // This will prevent submitting the form by throwing server error
+        //   // until all relations are resolved by the user
+        //   id: `Select stg page ${link.page.id}`,
+        // },
+        page: null,
+      };
+    } else {
+      return link;
+    }
+  };
+
+  const handleFile = async (data: any, key: KeyType) => {
+    if (data === null || data === undefined) {
+      return data;
+    }
+
+    if (typeof data === 'number') {
+      // Id
+      console.log('Unhandled file id', data, key);
+    }
+
+    try {
+      console.log('Fetching file', data.name, key);
+      const response = await fetch(data.url);
+
+      if (!response.ok) {
+        throw new Error('Response not ok');
+      }
+
+      const blob = await response.blob();
+
+      const formData = new FormData();
+      formData.set('files', blob);
+      const fileInfo = {
+        name: data.name,
+        caption: data.caption,
+        alternativeText: data.alternativeText,
+        folder: null,
+      };
+      formData.set('fileInfo', JSON.stringify(fileInfo));
+
+      console.log('Uploading file', fileInfo.name, key);
+
+      const uploadResponse = await fetch('/upload', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${auth.getToken()}`,
+          // Accept: 'application/json',
+          // 'Content-Type': 'multipart/form-data',
+        },
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Upload file failed');
+      }
+
+      const newFileData = JSON.parse(await uploadResponse.text())[0];
+
+      console.log(
+        'File import successful',
+        newFileData.name,
+        newFileData
+      );
+
+      return newFileData;
+    } catch (e) {
+      console.log('File import error', data, key);
+      console.error(e);
+    }
 
     return null;
   };
 
-  const prepareData = (data: any, key: (string | number)[]) => {
+  const prepareData = async (data: any, key: KeyType) => {
     console.log('Preparing', key.join('.'));
 
     if (typeof data === 'object' && data !== null) {
       if (data.length !== undefined) {
-        return (data as any[]).map((item, index) =>
-          prepareData(item, [
-            ...key,
-            item?.__component
-              ? `${item.__component.replace('.', '_')}#${index}`
-              : index,
-          ])
+        return await Promise.all(
+          (data as any[]).map(
+            async (item, index) =>
+              await prepareData(item, [
+                ...key,
+                item?.__component
+                  ? `${item.__component.replace('.', '_')}#${index}`
+                  : index,
+              ])
+          )
         );
       } else {
         // Object
@@ -77,43 +167,23 @@ export const StrapiListZoneItem = ({ strapi }) => {
           'updatedBy' in data &&
           'alternativeText' in data
         ) {
-          return prepareImage(data);
+          return await handleFile(data, key);
         }
 
         // Link
         if ('url' in data && 'target' in data && 'page' in data) {
-          const link = {
-            ...data,
-            icon: prepareImage(data.icon),
-          };
-
-          if (link.page?.id) {
-            // Link with relation
-            setLinkpageRelations((current) => [
-              ...current,
-              { key, data: link },
-            ]);
-            return {
-              ...link,
-              // page: {
-              //   // This will prevent submitting the form by throwing server error
-              //   // until all relations are resolved by the user
-              //   id: `Select stg page ${link.page.id}`,
-              // },
-              page: null,
-            };
-          } else {
-            return link;
-          }
+          return await handleLink(data, key);
         }
 
         return Object.fromEntries(
-          (Object.entries(data) as [string, any][])
-            .filter(([property]) => property !== 'id')
-            .map(([property, value]) => [
-              property,
-              prepareData(value, [...key, property]),
-            ])
+          await Promise.all(
+            (Object.entries(data) as [string, any][]).map(
+              async ([property, value]) => [
+                property,
+                await prepareData(value, [...key, property]),
+              ]
+            )
+          )
         );
       }
     }
@@ -137,18 +207,22 @@ export const StrapiListZoneItem = ({ strapi }) => {
       );
       console.log('Updatable top level keys:', updatableTopLevelKeys);
 
-      Object.keys(dataToImport)
-        .filter((key) => updatableTopLevelKeys.has(key))
-        .map((key) => {
-          try {
-            const data = prepareData(dataToImport[key], [key]);
-            console.log(`Importing ${key}`, data);
-            ctx.onChange({ target: { name: key, value: data } });
-          } catch (e) {
-            console.log('Import error', key);
-            console.error(e);
-          }
-        });
+      await Promise.all(
+        Object.keys(dataToImport)
+          .filter((key) => updatableTopLevelKeys.has(key))
+          .map(async (key) => {
+            try {
+              const data = await prepareData(dataToImport[key], [
+                key,
+              ]);
+              console.log(`Importing ${key}`, data);
+              ctx.onChange({ target: { name: key, value: data } });
+            } catch (e) {
+              console.log('Import error', key);
+              console.error(e);
+            }
+          })
+      );
 
       shouldTriggerValidation.current = true;
       console.log('Import done!');
@@ -191,7 +265,12 @@ export const StrapiListZoneItem = ({ strapi }) => {
   > = {
     inProgress: {
       variant: 'default',
-      children: 'Operation in progress.',
+      children: (
+        <Flex inline gap={1}>
+          {'Operation in progress.'}
+          <Loader small />
+        </Flex>
+      ),
     },
     error: {
       variant: 'danger',
@@ -221,7 +300,13 @@ export const StrapiListZoneItem = ({ strapi }) => {
       </Box>
       <Stack spacing={2}>
         {state === 'inProgress' ? (
-          <Loader />
+          <Flex
+            justifyContent="center"
+            paddingTop={3}
+            paddingBottom={5}
+          >
+            <Loader />
+          </Flex>
         ) : (
           <>
             <Button onClick={exportForm}>
