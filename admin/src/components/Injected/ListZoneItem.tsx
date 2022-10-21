@@ -4,21 +4,20 @@ import React, {
   useRef,
   ComponentProps,
 } from 'react';
-import { Stack } from '@strapi/design-system/Stack';
+// Context from Strapi Helper.
+import { useCMEditViewDataManager } from '@strapi/helper-plugin';
+import { auth } from '@strapi/helper-plugin';
 // Strapi Design System
+import { Stack } from '@strapi/design-system/Stack';
 import { Typography } from '@strapi/design-system/Typography';
 import { Divider } from '@strapi/design-system/Divider';
 import { Box } from '@strapi/design-system/Box';
 import { Button } from '@strapi/design-system/Button';
-// Context from Strapi Helper.
-import { useCMEditViewDataManager } from '@strapi/helper-plugin';
 import { Loader } from '@strapi/design-system/Loader';
 import { Alert } from '@strapi/design-system/Alert';
 import { Portal } from '@strapi/design-system/Portal';
 import { Flex } from '@strapi/design-system/Flex';
-import { auth } from '@strapi/helper-plugin';
 import { Switch } from '@strapi/design-system/Switch';
-import './style.css';
 import ExclamationMarkCircle from '@strapi/icons/ExclamationMarkCircle';
 import DownloadIcon from '@strapi/icons/Download';
 import UploadIcon from '@strapi/icons/Upload';
@@ -27,6 +26,8 @@ import {
   DialogBody,
   DialogFooter,
 } from '@strapi/design-system/Dialog';
+import './style.css';
+
 const emptyArray = [];
 
 type KeyType = (string | number)[];
@@ -413,10 +414,10 @@ export const StrapiListZoneItem = ({ strapi }) => {
             await response.text()
           ).results;
 
-          console.log(
-            `Found ${existingAssets.current!.length} existing assets`,
-            existingAssets.current
-          );
+          // console.log(
+          //   `Found ${existingAssets.current!.length} existing assets`,
+          //   existingAssets.current
+          // );
         } catch (e) {
           console.log('Failed to fetch existing assets');
           console.error(e);
@@ -459,8 +460,6 @@ export const StrapiListZoneItem = ({ strapi }) => {
 
       ctx.triggerFormValidation();
       ctx.checkFormErrors();
-      // @TODO. Trigger form validation in draft state. Sometimes throws
-      // ctx.onPublish();
 
       shouldTriggerValidation.current = false;
     }
@@ -508,7 +507,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
       paddingRight={3}
     >
       <Typography variant="sigma" textColor="neutral600">
-        {'Export Import Form by UIG'}
+        {'Export Import Form BETA by UIG'}
       </Typography>
       <Box paddingTop={2} paddingBottom={6}>
         <Divider />

@@ -1,24 +1,32 @@
 {
-  "name": "strapi-plugin-export-import-form",
+  "name": "@uigstudio/strapi-plugin-export-import-form",
+  "private": false,
   "version": "0.6.0",
   "description": "Client-side export import content plugin",
   "strapi": {
+    "displayName": "Export/import form",
     "name": "export-import-form",
     "description": "Client-side export import content plugin",
     "kind": "plugin"
   },
-  "dependencies": {
-    "@strapi/strapi": "^4.4.3"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/UIGStudio/strapi-plugin-export-import-form.git"
   },
+  "bugs": {
+    "url": "https://github.com/UIGStudio/strapi-plugin-export-import-form/issues"
+  },
+  "homepage": "https://github.com/UIGStudio/strapi-plugin-export-import-form#readme",
+  "dependencies": {},
   "devDependencies": {
     "typescript": "4.6.3"
   },
   "author": {
-    "name": "UIG Studio"
+    "name": "Uig Studio <l.wielgus@uigstudio.com> (https://uigstudio.com)"
   },
   "maintainers": [
     {
-      "name": "UIG Studio"
+      "name": "Łukasz Wielgus <l.wielgus@uigstudio.com> (https://uigstudio.com)"
     }
   ],
   "engines": {
@@ -29,5 +37,11 @@
     "develop": "tsc -w",
     "build": "tsc"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "peerDependencies": {
+    "@strapi/design-system": "^1.2.5",
+    "@strapi/helper-plugin": "^4.4.5",
+    "@strapi/icons": "^1.2.5",
+    "@strapi/strapi": "^4.4.5"
+  }
 }
