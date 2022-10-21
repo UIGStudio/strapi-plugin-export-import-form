@@ -19,7 +19,14 @@ import { Flex } from '@strapi/design-system/Flex';
 import { auth } from '@strapi/helper-plugin';
 import { Switch } from '@strapi/design-system/Switch';
 import './style.css';
-
+import ExclamationMarkCircle from '@strapi/icons/ExclamationMarkCircle';
+import DownloadIcon from '@strapi/icons/Download';
+import UploadIcon from '@strapi/icons/Upload';
+import {
+  Dialog,
+  DialogBody,
+  DialogFooter,
+} from '@strapi/design-system/Dialog';
 const emptyArray = [];
 
 type KeyType = (string | number)[];
@@ -36,6 +43,11 @@ export const StrapiListZoneItem = ({ strapi }) => {
   const shouldTriggerValidation = useRef(false);
 
   const [useExistingAssets, setUseExistingAssets] = useState(true);
+  const [isConfirmDialogOpen, setIsConfirmDialogOpen] =
+    useState<Boolean>(false);
+  const [clipboardContents, setClipboardContents] = useState<
+    string | null
+  >(null);
 
   const existingAssets = useRef<Record<string, any>[] | null>();
 
@@ -71,12 +83,11 @@ export const StrapiListZoneItem = ({ strapi }) => {
       ]);
       return {
         ...link,
-        // page: {
-        //   // This will prevent submitting the form by throwing server error
-        //   // until all relations are resolved by the user
-        //   id: `Select stg page ${link.page.id}`,
-        // },
-        page: null,
+        page: {
+          // This will prevent submitting the form by throwing server error
+          // until all relations are resolved by a human
+          id: `Select stg page ${link.page.id}`,
+        },
       };
     } else {
       return link;
@@ -231,11 +242,11 @@ export const StrapiListZoneItem = ({ strapi }) => {
   const importForm = async () => {
     try {
       setState('inProgress');
-      console.log('Importing from clipboard');
+      setIsConfirmDialogOpen(false);
+      console.log('Importing from clipboard', clipboardContents);
       setLinkpageRelations(emptyArray);
       existingAssets.current = null;
-      const json = await navigator.clipboard.readText();
-      const dataToImport = JSON.parse(json);
+      const dataToImport = JSON.parse(clipboardContents!);
       console.log(dataToImport);
 
       const updatableTopLevelKeys = new Set(
@@ -312,7 +323,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
 
       ctx.triggerFormValidation();
       ctx.checkFormErrors();
-      // Trigger form validation in draft state.
+      // @TODO. Trigger form validation in draft state. Sometimes throws
       // ctx.onPublish();
 
       shouldTriggerValidation.current = false;
@@ -380,18 +391,27 @@ export const StrapiListZoneItem = ({ strapi }) => {
             <Flex gap={1}>
               <Switch
                 selected={useExistingAssets}
-                onChange={(event) =>
-                  setUseExistingAssets(event.target.value)
+                onChange={() =>
+                  setUseExistingAssets((current) => !current)
                 }
               />
               <Typography variant="sigma" textColor="neutral600">
                 {'Reuse existing assets if the same*'}
               </Typography>
             </Flex>
-            <Button onClick={exportForm}>
+            <Button onClick={exportForm} startIcon={<DownloadIcon />}>
               {'Export to clipboard'}
             </Button>
-            <Button onClick={importForm} variant="danger">
+            <Button
+              onClick={async () => {
+                setIsConfirmDialogOpen(true);
+                setClipboardContents(
+                  await navigator.clipboard.readText()
+                );
+              }}
+              variant="danger"
+              startIcon={<UploadIcon />}
+            >
               {'Import from clipboard'}
             </Button>
 
@@ -429,6 +449,63 @@ export const StrapiListZoneItem = ({ strapi }) => {
             />
           )}
         </div>
+        {isConfirmDialogOpen && (
+          <Dialog
+            onClose={() => setIsConfirmDialogOpen(false)}
+            title="Confirmation"
+            isOpen={isConfirmDialogOpen}
+          >
+            <DialogBody icon={<ExclamationMarkCircle />}>
+              <Stack spacing={2}>
+                <Flex alignItems="center" direction="column">
+                  {clipboardContents ? (
+                    <>
+                      <Typography>
+                        {'Are you sure you want to import this?'}
+                      </Typography>
+                      <Box
+                        style={{
+                          overflow: 'auto',
+                          maxHeight: '200px',
+                          maxWidth: '100%',
+                          width: '100%',
+                        }}
+                      >
+                        <Typography variant="pi">
+                          <pre>{clipboardContents}</pre>
+                        </Typography>
+                      </Box>
+                    </>
+                  ) : (
+                    <Typography>
+                      {'You must allow clipboard access first'}
+                    </Typography>
+                  )}
+                </Flex>
+              </Stack>
+            </DialogBody>
+            <DialogFooter
+              startAction={
+                <Button
+                  onClick={() => setIsConfirmDialogOpen(false)}
+                  variant="tertiary"
+                >
+                  {'Cancel'}
+                </Button>
+              }
+              endAction={
+                <Button
+                  variant="danger-light"
+                  disabled={!clipboardContents}
+                  startIcon={<UploadIcon />}
+                  onClick={importForm}
+                >
+                  {'Import'}
+                </Button>
+              }
+            />
+          </Dialog>
+        )}
       </Portal>
     </Box>
   );
