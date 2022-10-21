@@ -38,10 +38,13 @@ export const StrapiListZoneItem = ({ strapi }) => {
     null | 'inProgress' | 'success' | 'error'
   >(null);
 
-  const [linkPageRelations, setLinkpageRelations] =
-    useState<{ key: KeyType; data: any }[]>(emptyArray);
   const shouldTriggerValidation = useRef(false);
-
+  const pagesStore = useRef<
+    Record<'source' | 'destination', any[] | null | undefined>
+  >({ source: null, destination: null });
+  const [unmatchedPageRelations, setUnmatchedPageRelations] =
+    useState<{ key: KeyType; data: any }[]>(emptyArray);
+  const [matchPageRelations, setMatchPageRelations] = useState(true);
   const [useExistingAssets, setUseExistingAssets] = useState(true);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] =
     useState<Boolean>(false);
@@ -51,15 +54,73 @@ export const StrapiListZoneItem = ({ strapi }) => {
 
   const existingAssets = useRef<Record<string, any>[] | null>();
 
+  const fetchPages = async (locale: string) => {
+    try {
+      console.log('Fetching pages');
+      const response = await fetch(
+        `/content-manager/collection-types/api::page.page?page=1&pageSize=10000${
+          locale ? `&locale=${locale}` : ''
+        }`,
+        {
+          headers: {
+            Authorization: `Bearer ${auth.getToken()}`,
+          },
+        }
+      );
+
+      const pages = JSON.parse(await response.text()).results;
+      console.log(`Found ${pages.length} pages`, pages);
+      return pages.map(
+        ({
+          createdAt,
+          id,
+          isVisibleInListView,
+          publishedAt,
+          seo,
+          updatedAt,
+          versions,
+          versionNumber,
+          vuid,
+          title,
+        }) => ({
+          createdAt,
+          id,
+          isVisibleInListView,
+          publishedAt,
+          seo,
+          updatedAt,
+          versions,
+          versionNumber,
+          vuid,
+          title,
+        })
+      );
+    } catch (e) {
+      console.log(
+        'Could not fetch the list of pages, link relation matching unavailable'
+      );
+      console.error(e);
+    }
+  };
+
   const exportForm = async () => {
     try {
       setState('inProgress');
       console.log('Exporting from clipboard');
-      const data = ctx.initialData;
       console.log(ctx);
-      console.log(data);
-      const json = JSON.stringify(data, null, 2);
-      await navigator.clipboard.writeText(json);
+      const formData = ctx.initialData;
+      console.log(formData);
+      let pages;
+      if (matchPageRelations) {
+        pages = await fetchPages(formData.locale);
+      }
+      const dataToExport = {
+        formData,
+        pages,
+      };
+      await navigator.clipboard.writeText(
+        JSON.stringify(dataToExport, null, 2)
+      );
       console.log('Export successful');
       setState('success');
     } catch (e) {
@@ -76,8 +137,67 @@ export const StrapiListZoneItem = ({ strapi }) => {
     };
 
     if (link.page?.id) {
-      // Link with relation
-      setLinkpageRelations((current) => [
+      if (
+        matchPageRelations &&
+        pagesStore.current.source?.length &&
+        pagesStore.current.destination?.length
+      ) {
+        const sourcePage = pagesStore.current.source.find(
+          (page) => page.id === link.page.id
+        );
+
+        if (sourcePage) {
+          const matchedPage = pagesStore.current.destination.find(
+            (page) =>
+              page.title && sourcePage.title
+                ? page.title === sourcePage.title
+                : page.seo?.title && sourcePage.seo?.title
+                ? page.seo.title === sourcePage.seo.title
+                : false
+          );
+
+          if (matchedPage) {
+            console.log(
+              `Found equivalent page for #${sourcePage.id} ${
+                sourcePage.title || sourcePage.seo?.title
+              }`,
+              sourcePage,
+              matchedPage
+            );
+            return {
+              ...link,
+              page: {
+                id: matchedPage.id,
+                vuid: matchedPage.vuid,
+                versionNumber: matchedPage.versionNumber,
+                createdAt: matchedPage.createdAt,
+                updatedAt: matchedPage.updatedAt,
+                publishedAt: matchedPage.publishedAt,
+                isVisibleInListView: matchedPage.isVisibleInListView,
+              },
+            };
+          } else {
+            console.log(
+              `Page equivalent to #${sourcePage.id} ${
+                sourcePage.title || sourcePage.seo?.title
+              } could not be found here`,
+              sourcePage,
+              pagesStore.current
+            );
+          }
+        } else {
+          console.warn(
+            'Could not found source page for id',
+            link.page.id,
+            link,
+            pagesStore.current.source
+          );
+        }
+      }
+
+      // Unmatched page relation or matching disabled
+
+      setUnmatchedPageRelations((current) => [
         ...current,
         { key, data: link },
       ]);
@@ -86,7 +206,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
         page: {
           // This will prevent submitting the form by throwing server error
           // until all relations are resolved by a human
-          id: `Select stg page ${link.page.id}`,
+          id: `Select page equivalent to source id ${link.page.id}`,
         },
       };
     } else {
@@ -243,11 +363,28 @@ export const StrapiListZoneItem = ({ strapi }) => {
     try {
       setState('inProgress');
       setIsConfirmDialogOpen(false);
-      console.log('Importing from clipboard', clipboardContents);
-      setLinkpageRelations(emptyArray);
+      console.log('Importing from clipboard');
+      setUnmatchedPageRelations(emptyArray);
       existingAssets.current = null;
-      const dataToImport = JSON.parse(clipboardContents!);
-      console.log(dataToImport);
+      const { formData, pages } = JSON.parse(clipboardContents!);
+      console.log({ formData, pages });
+
+      if (
+        formData.locale &&
+        ctx.initialData.locale &&
+        formData.locale !== ctx.initialData.locale
+      ) {
+        throw new Error(
+          `Current locale ${ctx.initialData.locale} does not match source locale ${formData.locale}. Create a new entry with correct locale.`
+        );
+      }
+
+      if (matchPageRelations) {
+        pagesStore.current.source = pages;
+        pagesStore.current.destination = await fetchPages(
+          formData.locale
+        );
+      }
 
       const updatableTopLevelKeys = new Set(
         (ctx.updateActionAllowedFields as string[]).map((key) =>
@@ -287,13 +424,11 @@ export const StrapiListZoneItem = ({ strapi }) => {
       }
 
       await Promise.all(
-        Object.keys(dataToImport)
+        Object.keys(formData)
           .filter((key) => updatableTopLevelKeys.has(key))
           .map(async (key) => {
             try {
-              const data = await prepareData(dataToImport[key], [
-                key,
-              ]);
+              const data = await prepareData(formData[key], [key]);
               console.log(`Importing ${key}`, data);
               ctx.onChange({ target: { name: key, value: data } });
             } catch (e) {
@@ -304,6 +439,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
       );
 
       shouldTriggerValidation.current = true;
+      pages.current = { source: null, destination: null };
       console.log('Import done!');
       setState('success');
     } catch (e) {
@@ -317,8 +453,8 @@ export const StrapiListZoneItem = ({ strapi }) => {
     if (shouldTriggerValidation.current) {
       console.log('Triggering validation', ctx);
       console.log(
-        `${linkPageRelations?.length}} page relations need to be set manually`,
-        linkPageRelations
+        `${unmatchedPageRelations?.length}} page relations need to be set manually`,
+        unmatchedPageRelations
       );
 
       ctx.triggerFormValidation();
@@ -399,6 +535,17 @@ export const StrapiListZoneItem = ({ strapi }) => {
                 {'Reuse existing assets if the same*'}
               </Typography>
             </Flex>
+            <Flex gap={1}>
+              <Switch
+                selected={matchPageRelations}
+                onChange={() =>
+                  setMatchPageRelations((current) => !current)
+                }
+              />
+              <Typography variant="sigma" textColor="neutral600">
+                {'Attempt to match link page relations'}
+              </Typography>
+            </Flex>
             <Button onClick={exportForm} startIcon={<DownloadIcon />}>
               {'Export to clipboard'}
             </Button>
@@ -415,16 +562,16 @@ export const StrapiListZoneItem = ({ strapi }) => {
               {'Import from clipboard'}
             </Button>
 
-            {linkPageRelations.length ? (
+            {unmatchedPageRelations.length ? (
               <>
                 <Box paddingTop={5} paddingBottom={2}>
                   <Divider />
                 </Box>
                 <Typography variant="sigma" textColor="danger600">
-                  {`There are ${linkPageRelations.length} page relations that require human intervention:`}
+                  {`There are ${unmatchedPageRelations.length} page relations that require human intervention:`}
                 </Typography>
                 <Stack spacing={1}>
-                  {linkPageRelations.map(({ key, data }) => (
+                  {unmatchedPageRelations.map(({ key, data }) => (
                     <Typography variant="pi" textColor="neutral600">
                       {key.join('.')}
                       {': $'}
