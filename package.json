@@ -1,7 +1,7 @@
 {
   "name": "@uigstudio/strapi-plugin-export-import-form",
   "private": false,
-  "version": "0.6.4",
+  "version": "0.6.5",
   "description": "Client-side export import content plugin",
   "strapi": {
     "displayName": "Export/import form",
