@@ -18,12 +18,14 @@
   },
   "homepage": "https://github.com/UIGStudio/strapi-plugin-export-import-form#readme",
   "dependencies": {
+    "copyfiles": "^2.4.1",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-router": "^6.4.2",
     "react-router-dom": "^6.4.2"
   },
   "devDependencies": {
+    "tscp": "^1.0.0",
     "typescript": "4.6.3"
   },
   "author": {
@@ -42,7 +44,7 @@
     "develop": "tsc -w",
     "build": "tsc",
     "publish:latest": "cd build && npm publish --tag latest",
-    "prepublish:latest": "yarn build; node build/setup-package.js"
+    "prepublish:latest": "rm -rf ./build && yarn build; copyfiles admin/**/*.css admin/**/*.json build/ && node build/setup-package.js"
   },
   "license": "MIT",
   "peerDependencies": {
