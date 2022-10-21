@@ -1,7 +1,7 @@
 {
   "name": "@uigstudio/strapi-plugin-export-import-form",
   "private": false,
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Client-side export import content plugin",
   "strapi": {
     "displayName": "Export/import form",
@@ -42,7 +42,7 @@
     "develop": "tsc -w",
     "build": "tsc",
     "publish:latest": "cd build && npm publish --tag latest",
-    "prepublish:latest": "yarn build && node build/setup-package.js"
+    "prepublish:latest": "yarn build; node build/setup-package.js"
   },
   "license": "MIT",
   "peerDependencies": {
