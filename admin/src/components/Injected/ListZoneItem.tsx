@@ -135,6 +135,12 @@ export const StrapiListZoneItem = ({ strapi }) => {
     const link = {
       ...data,
       icon: await handleFile(data.icon, key),
+      children:
+        data.children &&
+        ((await prepareData(data.children, [
+          ...key,
+          'children',
+        ])) as any),
     };
 
     if (link.page?.id) {
@@ -533,7 +539,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
                   setUseExistingAssets((current) => !current)
                 }
               />
-              <Typography variant="sigma" textColor="neutral600">
+              <Typography variant="pi" textColor="neutral600">
                 {'Reuse existing assets if the same*'}
               </Typography>
             </Flex>
@@ -544,7 +550,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
                   setMatchPageRelations((current) => !current)
                 }
               />
-              <Typography variant="sigma" textColor="neutral600">
+              <Typography variant="pi" textColor="neutral600">
                 {'Attempt to match link page relations'}
               </Typography>
             </Flex>
