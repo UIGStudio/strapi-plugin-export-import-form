@@ -27,6 +27,7 @@ import {
   DialogFooter,
 } from '@strapi/design-system/Dialog';
 import './style.css';
+import pluginPkg from '../../../../package.json';
 
 const emptyArray = [];
 
@@ -516,7 +517,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
       paddingRight={3}
     >
       <Typography variant="sigma" textColor="neutral600">
-        {'Export Import Form BETA by UIG'}
+        {`Export Import Form ${pluginPkg.version} by UIG`}
       </Typography>
       <Box paddingTop={2} paddingBottom={6}>
         <Divider />
