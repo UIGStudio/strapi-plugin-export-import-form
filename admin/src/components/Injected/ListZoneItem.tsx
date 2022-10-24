@@ -169,6 +169,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
               ...link,
               page: {
                 id: matchedPage.id,
+                title: matchedPage.title,
                 vuid: matchedPage.vuid,
                 versionNumber: matchedPage.versionNumber,
                 createdAt: matchedPage.createdAt,
@@ -207,7 +208,9 @@ export const StrapiListZoneItem = ({ strapi }) => {
         page: {
           // This will prevent submitting the form by throwing server error
           // until all relations are resolved by a human
-          id: `Select page equivalent to source id ${link.page.id}`,
+          id: `Select page ${
+            link.page.title || link.page.seo?.title || link.page.id
+          }`,
         },
       };
     } else {
@@ -454,7 +457,7 @@ export const StrapiListZoneItem = ({ strapi }) => {
     if (shouldTriggerValidation.current) {
       console.log('Triggering validation', ctx);
       console.log(
-        `${unmatchedPageRelations?.length}} page relations need to be set manually`,
+        `${unmatchedPageRelations?.length} page relations need to be set manually`,
         unmatchedPageRelations
       );
 
@@ -573,8 +576,8 @@ export const StrapiListZoneItem = ({ strapi }) => {
                   {unmatchedPageRelations.map(({ key, data }) => (
                     <Typography variant="pi" textColor="neutral600">
                       {key.join('.')}
-                      {': $'}
-                      {data?.page?.id}
+                      {/* {': $'}
+                      {data?.page?.id} */}
                     </Typography>
                   ))}
                 </Stack>
